@@ -3,8 +3,11 @@ import random
 import pandas as pd
 import datetime
 from ez_openai import Assistant, openai_function
-import pydeck as pdk
+import folium
+from streamlit_folium import folium_static
 import re
+from meteostat import Point, Daily
+from datetime import datetime
 
 # Define the tools/functions with plot_id and string inputs for bounding_box and types
 
@@ -83,29 +86,43 @@ def calculate_nvdi() -> str:
 })
 def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_date: str) -> str:
     types_list = [t.strip() for t in types.split(',')]
-    start_date_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    delta = (end_date_dt - start_date_dt).days + 1
-    dates = [start_date_dt + datetime.timedelta(days=i) for i in range(delta)]
-    data = []
-    for date in dates:
-        day_data = {"date": date.strftime("%Y-%m-%d")}
-        if 'temperature' in types_list:
-            day_data['temperature'] = round(random.uniform(10, 35), 1)  # Celsius
-        if 'precipitation' in types_list:
-            day_data['precipitation'] = round(random.uniform(0, 20), 1)  # mm
-        if 'wind_speed' in types_list:
-            day_data['wind_speed'] = round(random.uniform(0, 15), 1)  # m/s
-        data.append(day_data)
+    bbox = [float(x.strip()) for x in bounding_box.split(',')]
+    
+    # Use the center of the bounding box for the weather data
+    lat = (bbox[0] + bbox[2]) / 2
+    lon = (bbox[1] + bbox[3]) / 2
+    
+    # Create Point for the location
+    location = Point(lat, lon)
+    
+    # Convert string dates to datetime objects
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    # Fetch data
+    data = Daily(location, start, end)
+    data = data.fetch()
+    
+    # Prepare response
+    response_lines = [f"Meteorological data for types {', '.join(types_list)} from {start_date} to {end_date}:"]
+    
+    for date, row in data.iterrows():
+        line_parts = [f" - {date.strftime('%Y-%m-%d')}:"]
+        if 'temperature' in types_list and 'tavg' in row:
+            line_parts.append(f"Temperature: {row['tavg']:.1f}°C")
+        if 'precipitation' in types_list and 'prcp' in row:
+            line_parts.append(f"Precipitation: {row['prcp']:.1f}mm")
+        if 'wind_speed' in types_list and 'wspd' in row:
+            line_parts.append(f"Wind Speed: {row['wspd']:.1f}km/h")
+        response_lines.append(" ".join(line_parts))
+    
+    response = "\n".join(response_lines)
+    print(f"Fetched meteorological data for types {types_list}, bounding box {bounding_box} from {start_date} to {end_date}")
+    
     # Store temperature data in session state if temperature is in types_list
     if 'temperature' in types_list:
-        st.session_state['temperature_data'] = data
-    response_lines = [f"Meteorological data for types {', '.join(types_list)} from {start_date} to {end_date}:"]
-    for entry in data:
-        line = f" - {entry['date']}: " + ", ".join([f"{key.capitalize()}: {value}" for key, value in entry.items() if key != 'date'])
-        response_lines.append(line)
-    response = "\n".join(response_lines)
-    print(f"Fetching meteorological data for types {types_list}, bounding box {bounding_box} from {start_date} to {end_date}")
+        st.session_state['temperature_data'] = data['tavg'].to_frame()
+    
     return response
 
 @openai_function(descriptions={
@@ -115,9 +132,10 @@ def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_dat
     "end_date": "End date in YYYY-MM-DD format."
 })
 def fetch_meteo_forecast_timeline(types: str, bounding_box: str, start_date: str, end_date: str) -> str:
+    # For this demo, we'll generate random forecast data
     types_list = [t.strip() for t in types.split(',')]
-    start_date_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    start_date_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
     delta = (end_date_dt - start_date_dt).days + 1
     dates = [start_date_dt + datetime.timedelta(days=i) for i in range(delta)]
     data = []
@@ -132,7 +150,7 @@ def fetch_meteo_forecast_timeline(types: str, bounding_box: str, start_date: str
         data.append(day_data)
     # Store temperature data in session state if temperature is in types_list
     if 'temperature' in types_list:
-        st.session_state['temperature_data'] = data
+        st.session_state['temperature_data'] = pd.DataFrame(data).set_index('date')['temperature']
     response_lines = [f"Meteorological forecast for types {', '.join(types_list)} from {start_date} to {end_date}:"]
     for entry in data:
         line = f" - {entry['date']}: " + ", ".join([f"{key.capitalize()}: {value}" for key, value in entry.items() if key != 'date'])
@@ -180,30 +198,27 @@ bbox_match = re.search(r'Bounding Box: ([\d\.,-]+)', plot_data_str)
 if bbox_match:
     bbox_str = bbox_match.group(1)
     bbox_values = [float(x.strip()) for x in bbox_str.split(',')]
-    # Create polygon data
-    polygon = [[bbox_values[1], bbox_values[0]],
-               [bbox_values[3], bbox_values[0]],
-               [bbox_values[3], bbox_values[2]],
-               [bbox_values[1], bbox_values[2]],
-               [bbox_values[1], bbox_values[0]]]
-    polygon_layer = pdk.Layer(
-        "PolygonLayer",
-        data=[{"polygon": polygon}],
-        get_polygon="polygon",
-        get_fill_color=[0, 0, 0, 0],  # Transparent fill
-        get_line_color=[255, 0, 0],   # Red outline
-        get_line_width=2,
-        pickable=True,
-        stroked=True,
-        filled=False
-    )
-    view_state = pdk.ViewState(
-        longitude=(bbox_values[1] + bbox_values[3]) / 2,
-        latitude=(bbox_values[0] + bbox_values[2]) / 2,
-        zoom=12
-    )
-    r = pdk.Deck(layers=[polygon_layer], initial_view_state=view_state)
-    st.pydeck_chart(r)
+    
+    # Create a folium map
+    m = folium.Map(location=[(bbox_values[0] + bbox_values[2]) / 2, (bbox_values[1] + bbox_values[3]) / 2], 
+                   zoom_start=12, 
+                   tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                   attr="Esri")
+    
+    # Add polygon to the map
+    folium.Polygon(
+        locations=[
+            [bbox_values[0], bbox_values[1]],
+            [bbox_values[2], bbox_values[1]],
+            [bbox_values[2], bbox_values[3]],
+            [bbox_values[0], bbox_values[3]]
+        ],
+        color="red",
+        fill=False,
+    ).add_to(m)
+    
+    # Display the map
+    folium_static(m)
 
 # Display plot information
 st.subheader("Plot Information")
@@ -225,10 +240,6 @@ if user_input:
     if 'temperature_data' in st.session_state:
         st.subheader("Temperature Data")
         temperature_data = st.session_state['temperature_data']
-        df = pd.DataFrame(temperature_data)
-        df['date'] = pd.to_datetime(df['date'])
-        df.set_index('date', inplace=True)
-        if 'temperature' in df.columns:
-            st.line_chart(df['temperature'])
+        st.line_chart(temperature_data)
         # Clear the temperature data from session state
         del st.session_state['temperature_data']

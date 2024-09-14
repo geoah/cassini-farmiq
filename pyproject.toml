@@ -17,6 +17,10 @@ django-widget-tweaks = "^1.5.0"
 wxee = "^0.4.2"
 ez-openai = "^0.0.6"
 streamlit = "^1.38.0"
+requests = "^2.32.3"
+meteostat = "^1.6.8"
+folium = "^0.17.0"
+streamlit-folium = "^0.22.0"
 
 
 [build-system]

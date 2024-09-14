@@ -119,6 +119,20 @@ files = [
 ]
 
 [[package]]
+name = "branca"
+version = "0.7.2"
+description = "Generate complex HTML+JS pages with Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "branca-0.7.2-py3-none-any.whl", hash = "sha256:853a359c34d08fd06498be762d8be9932750db4049cac11e25dd6f23562e25c2"},
+    {file = "branca-0.7.2.tar.gz", hash = "sha256:ca4c94643ef31b819987ca5bd19c6009ea17b440baa3aac04628545f7a4da023"},
+]
+
+[package.dependencies]
+jinja2 = ">=3"
+
+[[package]]
 name = "cachetools"
 version = "5.5.0"
 description = "Extensible memoizing collections and decorators"
@@ -421,6 +435,27 @@ files = [
 
 [package.dependencies]
 openai = ">=1.3.5"
+
+[[package]]
+name = "folium"
+version = "0.17.0"
+description = "Make beautiful maps with Leaflet.js & Python"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "folium-0.17.0-py2.py3-none-any.whl", hash = "sha256:14210d054e9afad6ebac037495508297d78805fcfa16f859fdee10bb7f85c2c1"},
+    {file = "folium-0.17.0.tar.gz", hash = "sha256:48385df9a3f6ceca23647c2e8d87850c8a6e05b40db63266e7b8c6d2d734d4c6"},
+]
+
+[package.dependencies]
+branca = ">=0.6.0"
+jinja2 = ">=2.9"
+numpy = "*"
+requests = "*"
+xyzservices = "*"
+
+[package.extras]
+testing = ["pytest"]
 
 [[package]]
 name = "gitdb"
@@ -969,6 +1004,22 @@ files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
 ]
+
+[[package]]
+name = "meteostat"
+version = "1.6.8"
+description = "Access and analyze historical weather and climate data with Python."
+optional = false
+python-versions = ">=3.6.0"
+files = [
+    {file = "meteostat-1.6.8-py3-none-any.whl", hash = "sha256:859a7f2cbf3d902e9ce48363ff9490385a22296742ced7070360d06d3415ef97"},
+    {file = "meteostat-1.6.8.tar.gz", hash = "sha256:e4e1e3df79e52d45116a12a5ac703acf75d521356de072052c1f60e42160a74d"},
+]
+
+[package.dependencies]
+numpy = "*"
+pandas = ">=1.1"
+pytz = "*"
 
 [[package]]
 name = "narwhals"
@@ -2084,6 +2135,23 @@ watchdog = {version = ">=2.1.5,<5", markers = "platform_system != \"Darwin\""}
 snowflake = ["snowflake-connector-python (>=2.8.0)", "snowflake-snowpark-python[modin] (>=1.17.0)"]
 
 [[package]]
+name = "streamlit-folium"
+version = "0.22.0"
+description = "Render Folium objects in Streamlit"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "streamlit_folium-0.22.0-py3-none-any.whl", hash = "sha256:ee91553e6a6db285f6e6c61e047f1374d9428be1857332a36a552911dd22b7d0"},
+    {file = "streamlit_folium-0.22.0.tar.gz", hash = "sha256:9f2593507b53e16fa90b41dc7d1301d4327767a7787278843d18a91642c83682"},
+]
+
+[package.dependencies]
+branca = "*"
+folium = ">=0.13,<0.15.0 || >0.15.0"
+jinja2 = "*"
+streamlit = ">=1.13.0"
+
+[[package]]
 name = "tenacity"
 version = "8.5.0"
 description = "Retry code until it succeeds"
@@ -2290,7 +2358,18 @@ io = ["cftime", "fsspec", "h5netcdf", "netCDF4", "pooch", "pydap", "scipy", "zar
 parallel = ["dask[complete]"]
 viz = ["matplotlib", "nc-time-axis", "seaborn"]
 
+[[package]]
+name = "xyzservices"
+version = "2024.9.0"
+description = "Source of XYZ tiles providers"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "xyzservices-2024.9.0-py3-none-any.whl", hash = "sha256:776ae82b78d6e5ca63dd6a94abb054df8130887a4a308473b54a6bd364de8644"},
+    {file = "xyzservices-2024.9.0.tar.gz", hash = "sha256:68fb8353c9dbba4f1ff6c0f2e5e4e596bb9e1db7f94f4f7dfbcb26e25aa66fde"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "b8070763b30624763471061b1c76d8b5077319a245e9e555b7323ce34144b8ac"
+content-hash = "05376d4379c311bc58fc5c9d5637d892d9b268105abed12feab89f6f51b4affc"
