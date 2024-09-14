@@ -7,7 +7,7 @@ import folium
 from streamlit_folium import folium_static
 import re
 from meteostat import Point, Daily
-from datetime import datetime
+from datetime import datetime, timedelta
 import ee
 import matplotlib.pyplot as plt
 
@@ -39,6 +39,7 @@ def fetch_plot_data(plot_id: str) -> str:
     print(f"Fetching plot data for plot_id {plot_id}")
     return response
 
+
 @openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
     "types": "Meteorological data types as a string of comma-separated values (e.g., 'temperature,precipitation').",
@@ -64,30 +65,33 @@ def fetch_meteo_timeline(plot_id: str, types: str, start_date: str, end_date: st
     data = Daily(location, start, end)
     data = data.fetch()
     
-    # Prepare response
+    # Prepare response and data for chart
     response_lines = [f"Meteorological data for plot {plot_id} (bbox: {bbox}), types {', '.join(types_list)} from {start_date} to {end_date}:"]
+    chart_data = pd.DataFrame(index=data.index)
     
     for date, row in data.iterrows():
         line_parts = [f" - {date.strftime('%Y-%m-%d')}:"]
         if 'temperature' in types_list and 'tavg' in row:
             line_parts.append(f"Temperature: {row['tavg']:.1f}°C")
+            chart_data['Temperature (°C)'] = data['tavg']
         if 'precipitation' in types_list and 'prcp' in row:
             line_parts.append(f"Precipitation: {row['prcp']:.1f}mm")
+            chart_data['Precipitation (mm)'] = data['prcp']
         if 'wind_speed' in types_list and 'wspd' in row:
             line_parts.append(f"Wind Speed: {row['wspd']:.1f}km/h")
+            chart_data['Wind Speed (km/h)'] = data['wspd']
         response_lines.append(" ".join(line_parts))
     
     response = "\n".join(response_lines)
 
     print(f"Fetched meteorological data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     print("")
-    print(data)
+    print(response)
     print("-----")
     print("")
     
-    # Store temperature data in session state if temperature is in types_list
-    if 'temperature' in types_list:
-        st.session_state['temperature_data'] = data['tavg'].to_frame()
+    # Store chart data in session state
+    st.session_state['weather_chart_data'] = chart_data
     
     return response
 
@@ -103,26 +107,34 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     start_date_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
     delta = (end_date_dt - start_date_dt).days + 1
-    dates = [start_date_dt + datetime.timedelta(days=i) for i in range(delta)]
+    dates = [start_date_dt + timedelta(days=i) for i in range(delta)]
     data = []
     for date in dates:
-        day_data = {"date": date.strftime("%Y-%m-%d")}
+        day_data = {"date": date}
         if 'temperature' in types_list:
-            day_data['temperature'] = round(random.uniform(10, 35), 1)  # Celsius
+            day_data['Temperature (°C)'] = round(random.uniform(10, 35), 1)
         if 'precipitation' in types_list:
-            day_data['precipitation'] = round(random.uniform(0, 20), 1)  # mm
+            day_data['Precipitation (mm)'] = round(random.uniform(0, 20), 1)
         if 'wind_speed' in types_list:
-            day_data['wind_speed'] = round(random.uniform(0, 15), 1)  # m/s
+            day_data['Wind Speed (km/h)'] = round(random.uniform(0, 15), 1)
         data.append(day_data)
-    # Store temperature data in session state if temperature is in types_list
-    if 'temperature' in types_list:
-        st.session_state['temperature_data'] = pd.DataFrame(data).set_index('date')['temperature']
+    
+    # Create DataFrame and store in session state
+    chart_data = pd.DataFrame(data).set_index('date')
+    st.session_state['weather_chart_data'] = chart_data
+    
     response_lines = [f"Meteorological forecast for plot {plot_id} (bbox: {bbox}), types {', '.join(types_list)} from {start_date} to {end_date}:"]
     for entry in data:
-        line = f" - {entry['date']}: " + ", ".join([f"{key.capitalize()}: {value}" for key, value in entry.items() if key != 'date'])
+        line = f" - {entry['date'].strftime('%Y-%m-%d')}: " + ", ".join([f"{key}: {value}" for key, value in entry.items() if key != 'date'])
         response_lines.append(line)
     response = "\n".join(response_lines)
-    print(f"Fetching meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
+    
+    print("")
+    print(f"Fetched meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
+    print(response)
+    print("-----")
+    print("")
+    
     return response
 
 @openai_function(descriptions={
@@ -269,11 +281,12 @@ for message in st.session_state.messages:
         if "map" in message and message["map"] is not None:
             folium_static(message["map"])
         
-        # Display charts if available
-        if "temperature_chart" in message:
-            st.subheader("Temperature Data")
-            st.line_chart(message["temperature_chart"])
+        # Display weather chart if available
+        if "weather_chart" in message:
+            st.subheader("Weather Data")
+            st.line_chart(message["weather_chart"])
         
+        # Display NDVI chart if available
         if "ndvi_chart" in message:
             st.subheader("NDVI Data")
             st.line_chart(message["ndvi_chart"])
@@ -295,9 +308,9 @@ if prompt := st.chat_input("What would you like to know about the farm?"):
     # Prepare assistant message with charts
     assistant_message = {"role": "assistant", "content": full_response}
     
-    if 'temperature_data' in st.session_state:
-        assistant_message["temperature_chart"] = st.session_state.temperature_data
-        del st.session_state.temperature_data
+    if 'weather_chart_data' in st.session_state:
+        assistant_message["weather_chart"] = st.session_state.weather_chart_data
+        del st.session_state.weather_chart_data
     
     if 'ndvi_data' in st.session_state:
         assistant_message["ndvi_chart"] = st.session_state.ndvi_data
@@ -308,7 +321,3 @@ if prompt := st.chat_input("What would you like to know about the farm?"):
 
     # Rerun to update the chat display
     st.rerun()
-
-# Footer
-st.markdown("---")
-st.caption("Farm Perfect Assistant - Helping farmers optimize crop yield.")
