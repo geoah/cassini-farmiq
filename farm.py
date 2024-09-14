@@ -9,7 +9,7 @@ import re
 from meteostat import Point, Daily
 from datetime import datetime
 import ee
-import geemap
+import matplotlib.pyplot as plt
 
 # Initialize Earth Engine
 ee.Initialize()
@@ -177,6 +177,7 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     print(f"Fetching meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     return response
 
+
 @openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
     "start_date": "Start date for NDVI calculation in YYYY-MM-DD format.",
@@ -202,35 +203,37 @@ def fetch_ndvi_data(plot_id: str, start_date: str, end_date: str) -> str:
     # Map the NDVI function over the image collection
     s2_with_ndvi = s2.map(addNDVI)
 
-    # Get the mean NDVI for the period
-    mean_ndvi = s2_with_ndvi.select('NDVI').mean()
+    # Function to extract NDVI values
+    def extractNDVI(image):
+        date = ee.Date(image.get('system:time_start')).format('YYYY-MM-dd')
+        ndvi = image.reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=geometry,
+            scale=10
+        ).get('NDVI')
+        return ee.Feature(None, {'date': date, 'NDVI': ndvi})
 
-    # Create a map centered on the plot
-    center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
-    m = geemap.Map(center=center, zoom=18)
+    # Extract NDVI values
+    ndvi_values = s2_with_ndvi.map(extractNDVI).getInfo()
 
-    # Add the NDVI layer to the map
-    m.addLayer(mean_ndvi.clip(geometry), {'min': -1, 'max': 1, 'palette': ['blue', 'white', 'green']}, 'NDVI')
+    # Convert to pandas DataFrame
+    ndvi_df = pd.DataFrame([
+        {'date': feature['properties']['date'], 'NDVI': feature['properties']['NDVI']}
+        for feature in ndvi_values['features']
+    ])
+    ndvi_df['date'] = pd.to_datetime(ndvi_df['date'])
+    ndvi_df = ndvi_df.sort_values('date')
 
-    # Add a rectangle to show the plot boundaries
-    m.addLayer(ee.Feature(geometry), {}, 'Plot Boundary')
-
-    # Get the NDVI statistics for the plot
-    ndvi_stats = mean_ndvi.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=geometry,
-        scale=10
-    ).getInfo()
-
-    mean_ndvi_value = ndvi_stats['NDVI']
+    # Calculate mean NDVI
+    mean_ndvi = ndvi_df['NDVI'].mean()
 
     # Create the response string
     response = f"NDVI data for plot {plot_id} from {start_date} to {end_date}:\n"
-    response += f"Mean NDVI: {mean_ndvi_value:.4f}\n"
-    response += "NDVI map has been generated and can be displayed in the Streamlit app."
+    response += f"Mean NDVI: {mean_ndvi:.4f}\n"
+    response += "NDVI graph has been generated and can be displayed in the Streamlit app."
 
-    # Store the map in the session state for later display
-    st.session_state['ndvi_map'] = m
+    # Store the DataFrame in the session state for later display
+    st.session_state['ndvi_data'] = ndvi_df
 
     return response
 
@@ -321,10 +324,15 @@ if user_input:
         # Clear the temperature data from session state
         del st.session_state['temperature_data']
     
-    # Check if NDVI map was generated and display it
-    if 'ndvi_map' in st.session_state:
-        st.subheader("NDVI Map")
-        m = st.session_state['ndvi_map']
-        m.to_streamlit(height=400)
-        # Clear the NDVI map from session state
-        del st.session_state['ndvi_map']
+    # Check if NDVI data was generated and display the graph
+    if 'ndvi_data' in st.session_state:
+        st.subheader("NDVI Data")
+        ndvi_data = st.session_state['ndvi_data']
+        fig, ax = plt.subplots()
+        ax.plot(ndvi_data['date'], ndvi_data['NDVI'])
+        ax.set_xlabel('Date')
+        ax.set_ylabel('NDVI')
+        ax.set_title('NDVI Over Time')
+        st.pyplot(fig)
+        # Clear the NDVI data from session state
+        del st.session_state['ndvi_data']
