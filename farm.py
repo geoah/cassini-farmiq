@@ -83,15 +83,6 @@ def fetch_plot_data(plot_id: str) -> str:
     return response
 
 @openai_function(descriptions={
-    "plot_id": "The identifier of the plot."
-})
-def calculate_nvdi(plot_id: str) -> str:
-    bbox = get_bounding_box(plot_id)
-    response = f"Calculated NVDI values for plot {plot_id} (bbox: {bbox}): 0.65, 0.70, 0.75"
-    print(f"Calculating NVDI for plot {plot_id}")
-    return response
-
-@openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
     "types": "Meteorological data types as a string of comma-separated values (e.g., 'temperature,precipitation').",
     "start_date": "Start date in YYYY-MM-DD format.",
@@ -178,6 +169,7 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     return response
 
 
+
 @openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
     "start_date": "Start date for NDVI calculation in YYYY-MM-DD format.",
@@ -222,7 +214,7 @@ def fetch_ndvi_data(plot_id: str, start_date: str, end_date: str) -> str:
         for feature in ndvi_values['features']
     ])
     ndvi_df['date'] = pd.to_datetime(ndvi_df['date'])
-    ndvi_df = ndvi_df.sort_values('date')
+    ndvi_df = ndvi_df.sort_values('date').set_index('date')
 
     # Calculate mean NDVI
     mean_ndvi = ndvi_df['NDVI'].mean()
@@ -234,6 +226,11 @@ def fetch_ndvi_data(plot_id: str, start_date: str, end_date: str) -> str:
 
     # Store the DataFrame in the session state for later display
     st.session_state['ndvi_data'] = ndvi_df
+
+    print(f"Fetching NDVI data for plot {plot_id} from {start_date} to {end_date}")
+    print(ndvi_df)
+    print("-----")
+    print("")
 
     return response
 
@@ -249,7 +246,6 @@ ass = Assistant.create(
     functions=[
         fetch_satellite_timeline,
         fetch_plot_data,
-        calculate_nvdi,
         fetch_meteo_timeline,
         fetch_meteo_forecast_timeline,
         fetch_ndvi_data
@@ -328,11 +324,6 @@ if user_input:
     if 'ndvi_data' in st.session_state:
         st.subheader("NDVI Data")
         ndvi_data = st.session_state['ndvi_data']
-        fig, ax = plt.subplots()
-        ax.plot(ndvi_data['date'], ndvi_data['NDVI'])
-        ax.set_xlabel('Date')
-        ax.set_ylabel('NDVI')
-        ax.set_title('NDVI Over Time')
-        st.pyplot(fig)
+        st.line_chart(ndvi_data)
         # Clear the NDVI data from session state
         del st.session_state['ndvi_data']
