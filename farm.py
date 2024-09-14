@@ -125,8 +125,6 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     print(f"Fetching meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     return response
 
-
-
 @openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
     "start_date": "Start date for NDVI calculation in YYYY-MM-DD format.",
@@ -197,7 +195,9 @@ ass = Assistant.create(
     instructions=(
         "You are Farm Perfect, an agriculture expert system that helps farmers optimize crop yield "
         "by analyzing historical and predicted data. The user will provide the plot's ID with their message. "
-        "Use the plot ID to retrieve data for that specific plot using the tools available. "
+        "Use the plot ID to retrieve data for that specific plot using the tools available."
+        "Do not make up data, only use the data provided by the tools."
+        "Do not return raw data, always return a summary of the data."
     ),
     functions=[
         fetch_plot_data,
@@ -210,75 +210,95 @@ ass = Assistant.create(
 # Create a conversation
 conversation = ass.conversation.create()
 
-# Start the Streamlit app
+# Streamlit app
 
 st.title("Farm Perfect Assistant")
 
-# Input for plot ID
-plot_id = st.text_input("Plot ID:", value="Plot123")
+# Initialize session state
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 
-# Fetch plot data
-plot_data_str = fetch_plot_data(plot_id)
+if 'plot_id' not in st.session_state:
+    st.session_state.plot_id = None
 
-# Display map with plot boundaries
-st.subheader("Plot Location")
-
-# Extract bounding box from plot data
-bbox_match = re.search(r'Bounding Box: ([\d\.,-]+)', plot_data_str)
-if bbox_match:
-    bbox_str = bbox_match.group(1)
-    bbox_values = [float(x.strip()) for x in bbox_str.split(',')]
+# Function to display plot information
+def display_plot_info(plot_id):
+    plot_data_str = fetch_plot_data(plot_id)
     
-    # Create a folium map
-    m = folium.Map(location=[(bbox_values[0] + bbox_values[2]) / 2, (bbox_values[1] + bbox_values[3]) / 2], 
-                   zoom_start=18,  # Increased zoom level for smaller area
-                   tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                   attr="Esri")
-    
-    # Add polygon to the map
-    folium.Polygon(
-        locations=[
-            [bbox_values[0], bbox_values[1]],
-            [bbox_values[2], bbox_values[1]],
-            [bbox_values[2], bbox_values[3]],
-            [bbox_values[0], bbox_values[3]]
-        ],
-        color="red",
-        fill=False,
-    ).add_to(m)
-    
-    # Display the map
-    folium_static(m)
+    # Display map with plot boundaries
+    st.subheader("Plot Location")
+    bbox_match = re.search(r'Bounding Box: ([\d\.,-]+)', plot_data_str)
+    if bbox_match:
+        bbox_str = bbox_match.group(1)
+        bbox_values = [float(x.strip()) for x in bbox_str.split(',')]
+        
+        m = folium.Map(location=[(bbox_values[0] + bbox_values[2]) / 2, (bbox_values[1] + bbox_values[3]) / 2], 
+                       zoom_start=18,
+                       tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                       attr="Esri")
+        
+        folium.Polygon(
+            locations=[
+                [bbox_values[0], bbox_values[1]],
+                [bbox_values[2], bbox_values[1]],
+                [bbox_values[2], bbox_values[3]],
+                [bbox_values[0], bbox_values[3]]
+            ],
+            color="red",
+            fill=False,
+        ).add_to(m)
+        
+        folium_static(m)
 
-# Display plot information
-st.subheader("Plot Information")
-st.text(plot_data_str)
+    # Display plot information
+    st.subheader("Plot Information")
+    st.text(plot_data_str)
 
-# Text input for user query
-user_input = st.text_input("Ask the assistant:")
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        
+        # Display graphs if available
+        if message["role"] == "assistant":
+            if 'temperature_data' in st.session_state:
+                st.subheader("Temperature Data")
+                st.line_chart(st.session_state.temperature_data)
+                del st.session_state.temperature_data
+            
+            if 'ndvi_data' in st.session_state:
+                st.subheader("NDVI Data")
+                st.line_chart(st.session_state.ndvi_data)
+                del st.session_state.ndvi_data
 
-if user_input:
-    user_input_with_plot_id = f"Plot ID: {plot_id}\n{user_input}"
-    # Use streaming
-    stream = conversation.ask_stream(user_input_with_plot_id)
-    response_placeholder = st.empty()
-    full_response = ""
-    for event in stream:
-        full_response += event.text
-        response_placeholder.write(full_response)
+# Chat input
+if prompt := st.chat_input("What would you like to know about the farm?"):
+    if st.session_state.plot_id is None:
+        # First message, set the plot ID
+        st.session_state.plot_id = "Plot123"  # You can modify this to allow user input
+        display_plot_info(st.session_state.plot_id)
+        st.session_state.messages.append({"role": "assistant", "content": f"Plot ID set to: {st.session_state.plot_id}"})
+
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Get assistant response
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        for event in conversation.ask_stream(f"Plot ID: {st.session_state.plot_id}\n{prompt}"):
+            full_response += event.text
+            message_placeholder.markdown(full_response + "▌")
+        message_placeholder.markdown(full_response)
     
-    # Check if temperature data was fetched and display the graph
-    if 'temperature_data' in st.session_state:
-        st.subheader("Temperature Data")
-        temperature_data = st.session_state['temperature_data']
-        st.line_chart(temperature_data)
-        # Clear the temperature data from session state
-        del st.session_state['temperature_data']
-    
-    # Check if NDVI data was generated and display the graph
-    if 'ndvi_data' in st.session_state:
-        st.subheader("NDVI Data")
-        ndvi_data = st.session_state['ndvi_data']
-        st.line_chart(ndvi_data)
-        # Clear the NDVI data from session state
-        del st.session_state['ndvi_data']
+    # Add assistant response to chat history
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+    # Rerun to update the chat display
+    st.rerun()
+
+# Footer
+st.markdown("---")
+st.caption("Farm Perfect Assistant - Helping farmers optimize crop yield.")
