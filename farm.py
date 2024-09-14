@@ -9,7 +9,10 @@ import re
 from meteostat import Point, Daily
 from datetime import datetime
 
-# Define the tools/functions with plot_id and string inputs for bounding_box and types
+# Helper function to get bounding box from plot_id
+def get_bounding_box(plot_id: str) -> tuple:
+    # For this POC, always return the same bounding box
+    return (40.712, -74.006, 40.713, -74.005)
 
 @openai_function(descriptions={
     "plot_id": "The identifier of the plot.",
@@ -18,9 +21,9 @@ from datetime import datetime
     "image_collection": "The satellite image collection to retrieve data from (e.g., 'COPERNICUS/S2')."
 })
 def fetch_satellite_timeline(plot_id: str, start_date: str, end_date: str, image_collection: str) -> str:
-    # For demo purposes, return a human-readable string
+    bbox = get_bounding_box(plot_id)
     response = (
-        f"Satellite data for plot {plot_id} from {start_date} to {end_date} using {image_collection}:\n"
+        f"Satellite data for plot {plot_id} (bbox: {bbox}) from {start_date} to {end_date} using {image_collection}:\n"
         " - 2023-05-01: Satellite data point 1\n"
         " - 2023-05-02: Satellite data point 2\n"
     )
@@ -31,10 +34,11 @@ def fetch_satellite_timeline(plot_id: str, start_date: str, end_date: str, image
     "plot_id": "The identifier of the plot."
 })
 def fetch_plot_data(plot_id: str) -> str:
+    bbox = get_bounding_box(plot_id)
     if plot_id == "Plot123":
         response = (
             f"Plot Data for {plot_id}:\n"
-            "Bounding Box: 40.9,23.0,41.0,23.1\n"
+            f"Bounding Box: {bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}\n"
             "Seasons:\n"
             " - Year: 2021, Crop: corn\n"
             "   - 2021-03-15: Sowing (Seed Type: Hybrid A, Quantity: 100kg)\n"
@@ -72,21 +76,24 @@ def fetch_plot_data(plot_id: str) -> str:
     print(f"Fetching plot data for plot_id {plot_id}")
     return response
 
-@openai_function()
-def calculate_nvdi() -> str:
-    response = "Calculated NVDI values: 0.65, 0.70, 0.75"
-    print("Calculating NVDI")
+@openai_function(descriptions={
+    "plot_id": "The identifier of the plot."
+})
+def calculate_nvdi(plot_id: str) -> str:
+    bbox = get_bounding_box(plot_id)
+    response = f"Calculated NVDI values for plot {plot_id} (bbox: {bbox}): 0.65, 0.70, 0.75"
+    print(f"Calculating NVDI for plot {plot_id}")
     return response
 
 @openai_function(descriptions={
+    "plot_id": "The identifier of the plot.",
     "types": "Meteorological data types as a string of comma-separated values (e.g., 'temperature,precipitation').",
-    "bounding_box": "The bounding box of the area as a string of comma-separated floats.",
     "start_date": "Start date in YYYY-MM-DD format.",
     "end_date": "End date in YYYY-MM-DD format."
 })
-def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_date: str) -> str:
+def fetch_meteo_timeline(plot_id: str, types: str, start_date: str, end_date: str) -> str:
     types_list = [t.strip() for t in types.split(',')]
-    bbox = [float(x.strip()) for x in bounding_box.split(',')]
+    bbox = get_bounding_box(plot_id)
     
     # Use the center of the bounding box for the weather data
     lat = (bbox[0] + bbox[2]) / 2
@@ -104,7 +111,7 @@ def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_dat
     data = data.fetch()
     
     # Prepare response
-    response_lines = [f"Meteorological data for types {', '.join(types_list)} from {start_date} to {end_date}:"]
+    response_lines = [f"Meteorological data for plot {plot_id} (bbox: {bbox}), types {', '.join(types_list)} from {start_date} to {end_date}:"]
     
     for date, row in data.iterrows():
         line_parts = [f" - {date.strftime('%Y-%m-%d')}:"]
@@ -117,7 +124,12 @@ def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_dat
         response_lines.append(" ".join(line_parts))
     
     response = "\n".join(response_lines)
-    print(f"Fetched meteorological data for types {types_list}, bounding box {bounding_box} from {start_date} to {end_date}")
+
+    print(f"Fetched meteorological data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
+    print("")
+    print(data)
+    print("-----")
+    print("")
     
     # Store temperature data in session state if temperature is in types_list
     if 'temperature' in types_list:
@@ -126,13 +138,13 @@ def fetch_meteo_timeline(types: str, bounding_box: str, start_date: str, end_dat
     return response
 
 @openai_function(descriptions={
+    "plot_id": "The identifier of the plot.",
     "types": "Meteorological data types as a string of comma-separated values (e.g., 'temperature,precipitation').",
-    "bounding_box": "The bounding box of the area as a string of comma-separated floats.",
     "start_date": "Start date in YYYY-MM-DD format.",
     "end_date": "End date in YYYY-MM-DD format."
 })
-def fetch_meteo_forecast_timeline(types: str, bounding_box: str, start_date: str, end_date: str) -> str:
-    # For this demo, we'll generate random forecast data
+def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end_date: str) -> str:
+    bbox = get_bounding_box(plot_id)
     types_list = [t.strip() for t in types.split(',')]
     start_date_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -151,12 +163,12 @@ def fetch_meteo_forecast_timeline(types: str, bounding_box: str, start_date: str
     # Store temperature data in session state if temperature is in types_list
     if 'temperature' in types_list:
         st.session_state['temperature_data'] = pd.DataFrame(data).set_index('date')['temperature']
-    response_lines = [f"Meteorological forecast for types {', '.join(types_list)} from {start_date} to {end_date}:"]
+    response_lines = [f"Meteorological forecast for plot {plot_id} (bbox: {bbox}), types {', '.join(types_list)} from {start_date} to {end_date}:"]
     for entry in data:
         line = f" - {entry['date']}: " + ", ".join([f"{key.capitalize()}: {value}" for key, value in entry.items() if key != 'date'])
         response_lines.append(line)
     response = "\n".join(response_lines)
-    print(f"Fetching meteorological forecast data for types {types_list}, bounding box {bounding_box} from {start_date} to {end_date}")
+    print(f"Fetching meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     return response
 
 # Create the assistant
@@ -201,7 +213,7 @@ if bbox_match:
     
     # Create a folium map
     m = folium.Map(location=[(bbox_values[0] + bbox_values[2]) / 2, (bbox_values[1] + bbox_values[3]) / 2], 
-                   zoom_start=12, 
+                   zoom_start=18,  # Increased zoom level for smaller area
                    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                    attr="Esri")
     
