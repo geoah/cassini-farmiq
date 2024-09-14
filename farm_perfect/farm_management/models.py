@@ -4,7 +4,7 @@ import ee
 from datetime import datetime
 
 # Initialize the Earth Engine library
-ee.Authenticate(auth_mode="localhost")
+ee.Authenticate()
 ee.Initialize()
 
 class Plot(models.Model):

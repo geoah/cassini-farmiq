@@ -16,10 +16,20 @@ def plot_create(request):
         form = PlotForm()
     return render(request, 'farm_management/plot_form.html', {'form': form})
 
-def plot_detail(request, pk):
-    plot = get_object_or_404(Plot, pk=pk)
+def plot_detail(request, plot_id):
+    plot = get_object_or_404(Plot, pk=plot_id)
     seasons = plot.seasons.all()
-    return render(request, 'farm_management/plot_detail.html', {'plot': plot, 'seasons': seasons})
+    
+    # Fetch timeseries data for each season
+    for season in seasons:
+        season.cloud_timeline = season.fetch_cloud_timeline(season.start_date, season.end_date)
+        season.precipitation = season.fetch_precipitation(season.start_date, season.end_date)
+        season.methane = season.fetch_methane(season.start_date, season.end_date)
+    
+    return render(request, 'farm_management/plot_detail.html', {
+        'plot': plot,
+        'seasons': seasons,
+    })
 
 def season_create(request, plot_pk):
     plot = get_object_or_404(Plot, pk=plot_pk)
