@@ -8,6 +8,12 @@ from streamlit_folium import folium_static
 import re
 from meteostat import Point, Daily
 from datetime import datetime
+import ee
+import geemap
+
+# Initialize Earth Engine
+ee.Initialize()
+
 
 # Helper function to get bounding box from plot_id
 def get_bounding_box(plot_id: str) -> tuple:
@@ -171,6 +177,63 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     print(f"Fetching meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     return response
 
+@openai_function(descriptions={
+    "plot_id": "The identifier of the plot.",
+    "start_date": "Start date for NDVI calculation in YYYY-MM-DD format.",
+    "end_date": "End date for NDVI calculation in YYYY-MM-DD format."
+})
+def fetch_ndvi_data(plot_id: str, start_date: str, end_date: str) -> str:
+    bbox = get_bounding_box(plot_id)
+    
+    # Create an Earth Engine geometry from the bounding box
+    geometry = ee.Geometry.Rectangle([bbox[1], bbox[0], bbox[3], bbox[2]])
+    
+    # Get the Sentinel-2 image collection using the updated COPERNICUS/S2_SR_HARMONIZED dataset
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
+        .filterBounds(geometry) \
+        .filterDate(start_date, end_date) \
+        .sort('CLOUDY_PIXEL_PERCENTAGE')
+
+    # Function to calculate NDVI
+    def addNDVI(image):
+        ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI')
+        return image.addBands(ndvi)
+
+    # Map the NDVI function over the image collection
+    s2_with_ndvi = s2.map(addNDVI)
+
+    # Get the mean NDVI for the period
+    mean_ndvi = s2_with_ndvi.select('NDVI').mean()
+
+    # Create a map centered on the plot
+    center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+    m = geemap.Map(center=center, zoom=18)
+
+    # Add the NDVI layer to the map
+    m.addLayer(mean_ndvi.clip(geometry), {'min': -1, 'max': 1, 'palette': ['blue', 'white', 'green']}, 'NDVI')
+
+    # Add a rectangle to show the plot boundaries
+    m.addLayer(ee.Feature(geometry), {}, 'Plot Boundary')
+
+    # Get the NDVI statistics for the plot
+    ndvi_stats = mean_ndvi.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=10
+    ).getInfo()
+
+    mean_ndvi_value = ndvi_stats['NDVI']
+
+    # Create the response string
+    response = f"NDVI data for plot {plot_id} from {start_date} to {end_date}:\n"
+    response += f"Mean NDVI: {mean_ndvi_value:.4f}\n"
+    response += "NDVI map has been generated and can be displayed in the Streamlit app."
+
+    # Store the map in the session state for later display
+    st.session_state['ndvi_map'] = m
+
+    return response
+
 # Create the assistant
 ass = Assistant.create(
     name="Farm Perfect Assistant",
@@ -185,7 +248,8 @@ ass = Assistant.create(
         fetch_plot_data,
         calculate_nvdi,
         fetch_meteo_timeline,
-        fetch_meteo_forecast_timeline
+        fetch_meteo_forecast_timeline,
+        fetch_ndvi_data
     ]
 )
 
@@ -248,6 +312,7 @@ if user_input:
     for event in stream:
         full_response += event.text
         response_placeholder.write(full_response)
+    
     # Check if temperature data was fetched and display the graph
     if 'temperature_data' in st.session_state:
         st.subheader("Temperature Data")
@@ -255,3 +320,11 @@ if user_input:
         st.line_chart(temperature_data)
         # Clear the temperature data from session state
         del st.session_state['temperature_data']
+    
+    # Check if NDVI map was generated and display it
+    if 'ndvi_map' in st.session_state:
+        st.subheader("NDVI Map")
+        m = st.session_state['ndvi_map']
+        m.to_streamlit(height=400)
+        # Clear the NDVI map from session state
+        del st.session_state['ndvi_map']
