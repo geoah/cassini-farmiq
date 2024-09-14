@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>{{ plot.name }}</h2>
-<p><strong>Location:</strong></p>
-<div id="map" style="height: 400px;"></div>
+<h2 class="text-2xl font-bold mb-4">{{ plot.name }}</h2>
+<p class="font-semibold"><strong>Location:</strong></p>
+<div id="map" class="mb-4" style="height: 400px;"></div>
 
 <script>
     var map = L.map('map').setView([0, 0], 13);
@@ -15,24 +15,24 @@
     map.fitBounds(L.geoJSON(geojsonFeature).getBounds());
 </script>
 
-<h3>Seasons</h3>
-<ul>
+<h3 class="text-xl font-semibold mt-6 mb-2">Seasons</h3>
+<ul class="list-disc pl-5">
     {% for season in seasons %}
-        <li>
-            {{ season.crop }} ({{ season.start_date }} - {{ season.end_date }})
-            <ul>
+        <li class="mb-2">
+            <span class="font-medium">{{ season.crop }}</span> <span class="text-gray-600">({{ season.start_date }} - {{ season.end_date }})</span>
+            <ul class="list-disc pl-5 mt-1">
                 {% for event in season.events.all %}
-                    <li>{{ event.event_date }}: {{ event.description }}</li>
+                    <li class="text-gray-700">{{ event.event_date }}: {{ event.description }}</li>
                 {% empty %}
-                    <li>No events for this season.</li>
+                    <li class="text-gray-500">No events for this season.</li>
                 {% endfor %}
                 <!-- Link to add event to this season -->
-                <li><a href="{% url 'event_create' season.pk %}">Add Event to Season</a></li>
+                <li><a href="{% url 'event_create' season.pk %}" class="text-blue-500 hover:underline">Add Event to Season</a></li>
             </ul>
         </li>
     {% empty %}
-        <li>No seasons available.</li>
+        <li class="text-gray-500">No seasons available.</li>
     {% endfor %}
 </ul>
-<a href="{% url 'season_create' plot.pk %}">Add New Season</a>
+<a href="{% url 'season_create' plot.pk %}" class="mt-4 inline-block bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600">Add New Season</a>
 {% endblock %}
