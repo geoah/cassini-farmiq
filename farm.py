@@ -210,6 +210,7 @@ ass = Assistant.create(
 # Create a conversation
 conversation = ass.conversation.create()
 
+
 # Streamlit app
 
 st.title("Farm Perfect Assistant")
@@ -219,14 +220,13 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 if 'plot_id' not in st.session_state:
-    st.session_state.plot_id = None
+    st.session_state.plot_id = "Plot123"  # Set default plot ID
 
 # Function to display plot information
-def display_plot_info(plot_id):
+def get_plot_info(plot_id):
     plot_data_str = fetch_plot_data(plot_id)
     
-    # Display map with plot boundaries
-    st.subheader("Plot Location")
+    # Create map with plot boundaries
     bbox_match = re.search(r'Bounding Box: ([\d\.,-]+)', plot_data_str)
     if bbox_match:
         bbox_str = bbox_match.group(1)
@@ -248,41 +248,40 @@ def display_plot_info(plot_id):
             fill=False,
         ).add_to(m)
         
-        folium_static(m)
+        return plot_data_str, m
+    return plot_data_str, None
 
-    # Display plot information
-    st.subheader("Plot Information")
-    st.text(plot_data_str)
+# Add initial plot information if it's not already there
+if not st.session_state.messages:
+    plot_info, plot_map = get_plot_info(st.session_state.plot_id)
+    st.session_state.messages.append({
+        "role": "assistant", 
+        "content": f"Welcome to Farm Perfect Assistant! Here's the initial plot information for Plot ID: {st.session_state.plot_id}\n\n{plot_info}",
+        "map": plot_map
+    })
 
 # Display chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         
-        # Display graphs if available
-        if message["role"] == "assistant":
-            if 'temperature_data' in st.session_state:
-                st.subheader("Temperature Data")
-                st.line_chart(st.session_state.temperature_data)
-                del st.session_state.temperature_data
-            
-            if 'ndvi_data' in st.session_state:
-                st.subheader("NDVI Data")
-                st.line_chart(st.session_state.ndvi_data)
-                del st.session_state.ndvi_data
+        # Display map if available
+        if "map" in message and message["map"] is not None:
+            folium_static(message["map"])
+        
+        # Display charts if available
+        if "temperature_chart" in message:
+            st.subheader("Temperature Data")
+            st.line_chart(message["temperature_chart"])
+        
+        if "ndvi_chart" in message:
+            st.subheader("NDVI Data")
+            st.line_chart(message["ndvi_chart"])
 
 # Chat input
 if prompt := st.chat_input("What would you like to know about the farm?"):
-    if st.session_state.plot_id is None:
-        # First message, set the plot ID
-        st.session_state.plot_id = "Plot123"  # You can modify this to allow user input
-        display_plot_info(st.session_state.plot_id)
-        st.session_state.messages.append({"role": "assistant", "content": f"Plot ID set to: {st.session_state.plot_id}"})
-
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
 
     # Get assistant response
     with st.chat_message("assistant"):
@@ -293,8 +292,19 @@ if prompt := st.chat_input("What would you like to know about the farm?"):
             message_placeholder.markdown(full_response + "▌")
         message_placeholder.markdown(full_response)
     
+    # Prepare assistant message with charts
+    assistant_message = {"role": "assistant", "content": full_response}
+    
+    if 'temperature_data' in st.session_state:
+        assistant_message["temperature_chart"] = st.session_state.temperature_data
+        del st.session_state.temperature_data
+    
+    if 'ndvi_data' in st.session_state:
+        assistant_message["ndvi_chart"] = st.session_state.ndvi_data
+        del st.session_state.ndvi_data
+    
     # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.messages.append(assistant_message)
 
     # Rerun to update the chat display
     st.rerun()
