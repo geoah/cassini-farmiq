@@ -14,6 +14,7 @@ psycopg2-binary = "^2.9.9"
 psycopg2 = "^2.9.9"
 dj-database-url = "^2.2.0"
 django-widget-tweaks = "^1.5.0"
+wxee = "^0.4.2"
 
 
 [build-system]

@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     postgresql-client \
     gcc \
+    g++ \
     python3-dev \
     musl-dev
 
@@ -21,7 +22,7 @@ COPY pyproject.toml poetry.lock ./
 # Install Poetry or pip dependencies
 RUN pip install poetry
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
+    && poetry lock && poetry install --no-interaction --no-ansi
 
 # Copy the rest of the application code
 COPY . .
