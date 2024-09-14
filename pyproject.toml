@@ -4,12 +4,15 @@ version = "0.1.0"
 description = ""
 authors = ["George Antoniadis <george@noodles.gr>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
 django = "^5.1.1"
 django-leaflet = "^0.30.1"
 psycopg2-binary = "^2.9.9"
+psycopg2 = "^2.9.9"
+dj-database-url = "^2.2.0"
 
 
 [build-system]

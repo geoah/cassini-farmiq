@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ plot.name }}</h2>
+<p><strong>Location:</strong></p>
+<div id="map" style="height: 400px;"></div>
+
+<script>
+    var map = L.map('map').setView([0, 0], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    var geojsonFeature = {{ plot.location.geojson|safe }};
+    L.geoJSON(geojsonFeature).addTo(map);
+    map.fitBounds(L.geoJSON(geojsonFeature).getBounds());
+</script>
+
+<h3>Seasons</h3>
+<ul>
+    {% for season in seasons %}
+        <li>
+            {{ season.crop }} ({{ season.start_date }} - {{ season.end_date }})
+            <ul>
+                {% for event in season.events.all %}
+                    <li>{{ event.event_date }}: {{ event.description }}</li>
+                {% empty %}
+                    <li>No events for this season.</li>
+                {% endfor %}
+                <!-- Link to add event to this season -->
+                <li><a href="{% url 'event_create' season.pk %}">Add Event to Season</a></li>
+            </ul>
+        </li>
+    {% empty %}
+        <li>No seasons available.</li>
+    {% endfor %}
+</ul>
+<a href="{% url 'season_create' plot.pk %}">Add New Season</a>
+{% endblock %}

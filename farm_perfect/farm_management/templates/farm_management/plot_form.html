@@ -1,0 +1,19 @@
+{% load leaflet_tags %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Plot</title>
+    {% leaflet_js plugins="forms" %}
+    {% leaflet_css plugins="forms" %}
+</head>
+<body>
+    <h1>Add Plot</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>

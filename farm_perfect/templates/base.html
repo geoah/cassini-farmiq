@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Farm Perfect</title>
+    {% load static %}
+    {% load leaflet_tags %}
+    {% leaflet_css %}
+    {% leaflet_js %}
+</head>
+<body>
+    <header>
+        <h1>Farm Perfect</h1>
+        <p>Welcome, {{ user.username }}</p>
+    </header>
+    <hr>
+    {% block content %}
+    {% endblock %}
+</body>
+</html>
