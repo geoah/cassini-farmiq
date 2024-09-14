@@ -22,7 +22,7 @@
             <span class="font-medium">{{ season.crop }}</span> <span class="text-gray-600">({{ season.start_date }} - {{ season.end_date }})</span>
             <ul class="list-disc pl-5 mt-1">
                 {% for event in season.events.all %}
-                    <li class="text-gray-700">{{ event.event_date }}: {{ event.description }}</li>
+                    <li class="text-gray-700">{{ event.event_date }} {{ event.event_type }}</li>
                 {% empty %}
                     <li class="text-gray-500">No events for this season.</li>
                 {% endfor %}
