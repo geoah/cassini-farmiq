@@ -248,6 +248,7 @@ if 'messages' not in st.session_state:
 if 'plot_id' not in st.session_state:
     st.session_state.plot_id = "Plot123"  # Set default plot ID
 
+
 # Function to display plot information
 def get_plot_info(plot_id):
     plot_data_str = fetch_plot_data(plot_id)
@@ -282,8 +283,9 @@ if not st.session_state.messages:
     plot_info, plot_map = get_plot_info(st.session_state.plot_id)
     st.session_state.messages.append({
         "role": "assistant", 
-        "content": f"Welcome to Farm IQ Assistant! Here's the initial plot information for Plot ID: {st.session_state.plot_id}\n\n{plot_info}",
-        "map": plot_map
+        "content": f"Welcome to Farm IQ Assistant! Here's the initial plot information for Plot ID: {st.session_state.plot_id}",
+        "map": plot_map,
+        "plot_info": plot_info
     })
 
 # Display chat messages
@@ -293,7 +295,14 @@ for message in st.session_state.messages:
         
         # Display map if available
         if "map" in message and message["map"] is not None:
-            folium_static(message["map"])
+            with st.container():
+                st.subheader("Plot Map")
+                folium_static(message["map"], height=300)  # Adjust the height as needed
+        
+        # Display plot information if available
+        if "plot_info" in message:
+            st.subheader("Plot Information")
+            st.markdown(message["plot_info"])
         
         # Display weather chart if available
         if "weather_chart" in message:
