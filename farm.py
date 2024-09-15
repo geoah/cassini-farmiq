@@ -86,8 +86,8 @@ def fetch_meteo_timeline(plot_id: str, types: str, start_date: str, end_date: st
 
     print(f"Fetched meteorological data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
     print("")
-    print(response)
-    print("-----")
+    print("\n".join(response.split("\n")[:10]))
+    print("...")
     print("")
     
     # Store chart data in session state
@@ -131,8 +131,8 @@ def fetch_meteo_forecast_timeline(plot_id: str, types: str, start_date: str, end
     
     print("")
     print(f"Fetched meteorological forecast data for plot {plot_id}, types {types_list} from {start_date} to {end_date}")
-    print(response)
-    print("-----")
+    print("\n".join(response.split("\n")[:10]))
+    print("...")
     print("")
     
     return response
@@ -203,14 +203,28 @@ def fetch_ndvi_data(plot_id: str, start_date: str, end_date: str) -> str:
 
 # Create the assistant
 ass = Assistant.create(
-    name="Farm Perfect Assistant",
-    instructions=(
-        "You are Farm Perfect, an agriculture expert system that helps farmers optimize crop yield "
-        "by analyzing historical and predicted data. The user will provide the plot's ID with their message. "
-        "Use the plot ID to retrieve data for that specific plot using the tools available."
-        "Do not make up data, only use the data provided by the tools."
-        "Do not return raw data, always return a summary of the data."
-    ),
+    name="Farm IQ Assistant",
+    instructions=("""
+**You are Farm IQ, an advanced agriculture expert system dedicated to helping farmers optimize crop yields and manage challenges posed by climate instability.**
+
+- **User Interaction:** Users will provide their plot's ID within their messages.
+  
+- **Data Retrieval:** Utilize the provided plot ID to access relevant data for that specific plot using available tools, including historical season data, weather forecasts, satellite imagery, and VDVI (Vegetation Drought Vegetation Index) data.
+
+- **Data Handling:**
+  - **Accuracy:** Do not fabricate or assume any data. Only use information retrieved through the designated tools.
+  - **Presentation:** Always deliver data summaries and actionable insights instead of raw data.
+
+- **Predictions & Suggestions:**
+  - When users request forecasts or recommendations for future crops, leverage the latest weather forecasts and VDVI data.
+  - Provide strategic advice on:
+    - **Sowing:** Optimal crops to plant and the best times for sowing.
+    - **Irrigation:** Recommended watering schedules and quantities.
+    - **Harvesting:** Ideal harvesting periods to maximize yield and ROI.
+    - **Mitigation Strategies:** Approaches to mitigate the impact of extreme weather conditions.
+
+- **Objective:** Ensure that all recommendations aim to both mitigate the effects of climate instability and maximize the plot’s yield and return on investment.
+    """),
     functions=[
         fetch_plot_data,
         fetch_meteo_timeline,
@@ -225,7 +239,7 @@ conversation = ass.conversation.create()
 
 # Streamlit app
 
-st.title("Farm Perfect Assistant")
+st.title("Farm IQ Assistant")
 
 # Initialize session state
 if 'messages' not in st.session_state:
@@ -268,7 +282,7 @@ if not st.session_state.messages:
     plot_info, plot_map = get_plot_info(st.session_state.plot_id)
     st.session_state.messages.append({
         "role": "assistant", 
-        "content": f"Welcome to Farm Perfect Assistant! Here's the initial plot information for Plot ID: {st.session_state.plot_id}\n\n{plot_info}",
+        "content": f"Welcome to Farm IQ Assistant! Here's the initial plot information for Plot ID: {st.session_state.plot_id}\n\n{plot_info}",
         "map": plot_map
     })
 
